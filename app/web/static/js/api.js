@@ -197,6 +197,13 @@ export const api = {
   async addComment(id, body) {
     return (await request("POST", `/tickets/${id}/comments`, { body: { body } })).data;
   },
+  async listHandoverNotes(id) {
+    return (await request("GET", `/tickets/${id}/handover-notes`)).data;
+  },
+  async addHandoverNote(id, body) {
+    return (await request("POST", `/tickets/${id}/handover-notes`, { body: { body } })).data;
+  },
+
   async assign(id, technicianId) {
     return (await request("POST", `/tickets/${id}/assign`, { body: { technician_id: technicianId } })).data;
   },

@@ -243,6 +243,58 @@ function commentForm(ticket) {
   });
   return form;
 }
+// Notas internas de relevo (solo personal tecnico: technician, supervisor, administrator)
+function renderHandoverNotes(ticket, notes) {
+  if (!isStaff(user)) {
+    return null;
+  }
+  const items = notes.map((note) =>
+    el(
+      "li",
+      { className: "comment border-start border-warning border-3 ps-3" },
+      el("div", { className: "small text-body-secondary", text: `${personName(note.author_id)} · ${formatDateTime(note.created_at)}` }),
+      el("p", { className: "pre-wrap mb-0", text: note.body }),
+    ),
+  );
+  const list =
+    items.length === 0
+      ? el("p", { className: "text-body-secondary", text: "Aún no hay notas internas de relevo." })
+      : el("ul", { className: "list-unstyled comment-list" }, ...items);
+  return card(
+    "handover-notes-title",
+    `Notas internas de relevo (${notes.length})`,
+    el("p", { className: "small text-body-secondary mb-3", text: "Bitácora privada visible únicamente para soporte técnico." }),
+    list,
+    isTicketOpen(ticket) ? handoverNoteForm(ticket) : null,
+  );
+}
+
+function handoverNoteForm(ticket) {
+  const area = el("textarea", { className: "form-control", attrs: { id: "handover-note-body", name: "body", rows: "3", required: true } });
+  const button = el("button", { className: "btn btn-warning", text: "Agregar nota interna", attrs: { type: "submit" } });
+  const form = el(
+    "form",
+    { attrs: { novalidate: true }, className: "mt-3" },
+    el("label", { className: "form-label", text: "Nueva nota interna", attrs: { for: "handover-note-body" } }),
+    area,
+    el("div", { className: "mt-2" }, button),
+  );
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clearAlert(alertRegion);
+    clearFieldErrors(form);
+    const errors = validateComment(area.value);
+    if (Object.keys(errors).length > 0) {
+      showFieldErrors(form, errors);
+      return;
+    }
+    await runAction(button, "Guardando…", () => api.addHandoverNote(ticket.id, area.value.trim()), "Nota interna agregada.", {
+      form,
+      focusId: "handover-notes-title",
+    });
+  });
+  return form;
+}
 
 // 22/10/2026 - Historial: quien hizo que y cuando, del mas antiguo al mas reciente (el orden en que llega de la API).
 function renderHistory(ticket) {
@@ -262,23 +314,26 @@ function renderHistory(ticket) {
   );
 }
 
-function renderTicket(ticket) {
+function renderTicket(ticket, handoverNotes = []) {
   pageTitle.textContent = `Ticket #${ticket.id}`;
   document.title = `Ticket #${ticket.id} · HelpDesk EDU`;
+  const leftColumn = [renderComments(ticket)];
+  const handoverCard = renderHandoverNotes(ticket, handoverNotes);
+  if (handoverCard) {
+    leftColumn.push(handoverCard);
+  }
   view.replaceChildren(
     el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, renderSummary(ticket)), el("div", { className: "col-lg-4" }, renderActions(ticket))),
-    el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, renderComments(ticket)), el("div", { className: "col-lg-4" }, renderHistory(ticket))),
+    el("div", { className: "row g-3" }, el("div", { className: "col-lg-8" }, ...leftColumn), el("div", { className: "col-lg-4" }, renderHistory(ticket))),
   );
 }
 
-// --- carga y acciones -------------------------------------------------------------------
-
-// 22/10/2026 - Pide el ticket completo (con comentarios e historial) y lo dibuja. Estados: cargando, error, datos.
-// `focusId` dice a donde mandar el foco al terminar: sin esto, al redibujar, el teclado se quedaria en el vacio.
 async function loadTicket(focusId = null) {
   view.replaceChildren(loadingIndicator("Cargando ticket…"));
   try {
-    renderTicket(await api.getTicket(ticketId));
+    const ticket = await api.getTicket(ticketId);
+    const handoverNotes = isStaff(user) ? await api.listHandoverNotes(ticketId) : [];
+    renderTicket(ticket, handoverNotes);
     (document.getElementById(focusId ?? "") ?? document.getElementById("page-title")).focus();
   } catch (error) {
     view.replaceChildren();
@@ -287,6 +342,7 @@ async function loadTicket(focusId = null) {
     focusAlert(alertRegion);
   }
 }
+
 
 // 22/10/2026 - Ejecuta una accion contra la API con los tres estados: boton ocupado, exito (toast + recarga)
 // o error (alerta con el mensaje en espanol; un 403 o 409 es un resultado normal, no un fallo del cliente).
