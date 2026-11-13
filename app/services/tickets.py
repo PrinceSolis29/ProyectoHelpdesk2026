@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
+from app.models.internal_notes import NotaInterna
 
 from app.domain.clock import now
 from app.domain.errors import (
@@ -267,6 +268,42 @@ class TicketService:
 
     def add_comment(self, ticket_id: int, author_id: int, body: str) -> Comment:
         return self.comment(ticket_id=ticket_id, author_id=author_id, body=body)
+    def list_handover_notes(self, actor: User, ticket_id: int) -> list[NotaInterna]:
+        if not actor.is_staff:
+            raise PermissionDeniedError(
+                "Only support staff can view handover notes",
+                actor_id=actor.id,
+                ticket_id=ticket_id,
+            )
+        ticket = self.require(ticket_id)
+        return ticket.internal_notes
+
+    def add_handover_note(
+        self,
+        ticket_id: int,
+        author: User,
+        body: str,
+    ) -> NotaInterna:
+        if not author.is_staff:
+            raise PermissionDeniedError(
+                "Only support staff can add handover notes",
+                actor_id=author.id,
+                ticket_id=ticket_id,
+            )
+        ticket = self.require(ticket_id)
+        self._ensure_open(ticket)
+        if body is None or not body.strip():
+            raise ValidationError("handover note body is required", field="body")
+
+        note = NotaInterna(
+            ticket_id=ticket_id,
+            author_id=author.id,
+            body=body.strip(),
+        )
+        ticket.internal_notes.append(note)
+        ticket.updated_at = self._now()
+        self._repository.update(ticket)
+        return note
 
     # 22/10/2026 - Nuevo caso de uso de la semana 13: cambiar la prioridad. La base
     # recalcula due_at con su trigger y update() me devuelve el valor nuevo.

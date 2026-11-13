@@ -22,6 +22,7 @@ from __future__ import annotations
 from app.core.security import decode_access_token
 from app.domain.errors import AuthenticationError
 from app.models.comments import Comment
+from app.models.internal_notes import NotaInterna
 from app.models.entities import Ticket, User
 from app.models.enums import Role, TicketStatus
 from app.repositories.base import TicketPage
@@ -111,6 +112,12 @@ class HelpDeskFacade:
 
     def comment(self, author: User, ticket_id: int, body: str) -> Comment:
         return self._tickets.comment(ticket_id, author=author, body=body)
+    def list_handover_notes(self, actor: User, ticket_id: int) -> list[NotaInterna]:
+        return self._tickets.list_handover_notes(actor, ticket_id)
+
+    def add_handover_note(self, author: User, ticket_id: int, body: str) -> NotaInterna:
+        return self._tickets.add_handover_note(ticket_id, author=author, body=body)
+
 
     def assign(self, actor: User, ticket_id: int, technician_id: int) -> Ticket:
         return self._tickets.assign(ticket_id, technician_id, actor=actor)

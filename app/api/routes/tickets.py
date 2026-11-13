@@ -17,6 +17,8 @@ from app.schemas.tickets import (
     AssignRequest,
     CommentCreate,
     CommentOut,
+    HandoverNoteCreate,
+    HandoverNoteOut,
     PriorityChange,
     StatusChange,
     TicketCreate,
@@ -90,6 +92,27 @@ def list_comments(ticket_id: int, facade: FacadeDep, user: CurrentUser):
 )
 def add_comment(ticket_id: int, body: CommentCreate, facade: FacadeDep, user: CurrentUser):
     return facade.comment(user, ticket_id, body.body)
+
+# --- notas de relevo (handover notes) ---------------------------------------
+
+@router.get("/{ticket_id}/handover-notes", response_model=list[HandoverNoteOut])
+def list_handover_notes(ticket_id: int, facade: FacadeDep, user: CurrentUser):
+    return facade.list_handover_notes(user, ticket_id)
+
+
+@router.post(
+    "/{ticket_id}/handover-notes",
+    response_model=HandoverNoteOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_handover_note(
+    ticket_id: int,
+    body: HandoverNoteCreate,
+    facade: FacadeDep,
+    user: CurrentUser,
+):
+    return facade.add_handover_note(user, ticket_id, body.body)
+
 
 
 # --- acciones: cada una devuelve el ticket ya actualizado ---------------------
