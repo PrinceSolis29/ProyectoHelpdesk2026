@@ -90,6 +90,16 @@ CREATE TABLE articles (
   PRIMARY KEY (id),
   FOREIGN KEY(author_id) REFERENCES users (id)
 );
+CREATE TABLE internal_notes (
+  id SERIAL NOT NULL,
+  ticket_id INTEGER NOT NULL,
+  author_id INTEGER NOT NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  FOREIGN KEY(ticket_id) REFERENCES tickets (id) ON DELETE CASCADE,
+  FOREIGN KEY(author_id) REFERENCES users (id)
+);
 
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_assignee ON tickets(assignee_id);
@@ -97,4 +107,5 @@ CREATE INDEX idx_comments_ticket ON comments(ticket_id);
 CREATE INDEX idx_history_ticket ON history(ticket_id);
 -- Indice parcial: solo indexa lo que la bandeja consulta (no leidas).
 CREATE INDEX idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+CREATE INDEX idx_internal_notes_ticket ON internal_notes(ticket_id);
 
