@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.domain.clock import now
+from app.models.internal_notes import NotaInterna
 
 
 # 22/10/2026 - El comentario tampoco trae id propio: lo asigna la base al guardarlo.

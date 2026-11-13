@@ -4,6 +4,7 @@ from datetime import datetime
 from app.domain.clock import now
 from app.models.comments import Comment
 from app.models.enums import Role, TicketStatus
+from app.models.internal_notes import NotaInterna
 
 
 # 22/10/2026 - Los ids de todas las entidades son None hasta que el repositorio
@@ -59,6 +60,7 @@ class Ticket:
     assignee_id: int | None = None
     comments: list[Comment] = field(default_factory=list)
     history: list[HistoryEvent] = field(default_factory=list)
+    internal_notes: list[NotaInterna] = field(default_factory=list)
     created_at: datetime = field(default_factory=now)
     updated_at: datetime = field(default_factory=now)
     # Lo calcula el trigger de la base segun la prioridad: Python solo lo lee.
@@ -71,4 +73,5 @@ class Ticket:
     @property
     def is_assigned(self) -> bool:
         return self.assignee_id is not None
+    
     

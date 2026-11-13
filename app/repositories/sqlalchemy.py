@@ -24,6 +24,8 @@ from sqlalchemy.orm import (
 from app.domain.clock import now
 from app.domain.errors import ConflictError
 from app.models.comments import Comment
+from app.models.internal_notes import NotaInterna
+
 from app.models.entities import HistoryEvent, Ticket, User
 from app.models.enums import Role, TicketStatus
 from app.repositories.base import TicketPage, TicketQuery, TicketRepository, UserRepository
@@ -71,6 +73,13 @@ class TicketORM(Base):
         cascade="all, delete-orphan",
         order_by="CommentORM.id",
     )
+    internal_notes: Mapped[list["InternalNoteORM"]] = relationship(
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="InternalNoteORM.id",
+    )
+
+    
     history: Mapped[list["HistoryEventORM"]] = relationship(
         back_populates="ticket",
         cascade="all, delete-orphan",
@@ -88,6 +97,17 @@ class CommentORM(Base):
     created_at: Mapped[datetime]
 
     ticket: Mapped["TicketORM"] = relationship(back_populates="comments")
+class InternalNoteORM(Base):
+    __tablename__ = "internal_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"))
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime]
+
+    ticket: Mapped["TicketORM"] = relationship(back_populates="internal_notes")
+
 
 
 class HistoryEventORM(Base):
@@ -147,6 +167,17 @@ def _ticket_to_domain(row: TicketORM) -> Ticket:
         )
         for comment in row.comments
     ]
+    ticket.internal_notes = [
+        NotaInterna(
+            id=note.id,
+            ticket_id=note.ticket_id,
+            author_id=note.author_id,
+            body=note.body,
+            created_at=note.created_at,
+        )
+        for note in row.internal_notes
+    ]
+
     ticket.history = [
         HistoryEvent(
             id=event.id,
@@ -280,6 +311,19 @@ class SqlAlchemyTicketRepository(TicketRepository):
             for comment in ticket.comments
             if comment.id is None
         ]
+        new_notes = [
+            (
+                note,
+                InternalNoteORM(
+                    author_id=note.author_id,
+                    body=note.body,
+                    created_at=note.created_at,
+                ),
+            )
+            for note in ticket.internal_notes
+            if note.id is None
+        ]
+
         new_events = [
             (
                 event,
@@ -294,12 +338,17 @@ class SqlAlchemyTicketRepository(TicketRepository):
             if event.id is None
         ]
         row.comments.extend(comment_row for _, comment_row in new_comments)
+        row.internal_notes.extend(note_row for _, note_row in new_notes)
+
         row.history.extend(event_row for _, event_row in new_events)
 
         self._session.flush()
         # Devolvemos al dominio las llaves que genero PostgreSQL.
         for comment, comment_row in new_comments:
             comment.id = comment_row.id
+        for note, note_row in new_notes:
+            note.id = note_row.id
+
         for event, event_row in new_events:
             event.id = event_row.id
         # Si cambio la prioridad, el trigger recalculo due_at: lo releemos.
@@ -366,6 +415,12 @@ class SqlAlchemyTicketRepository(TicketRepository):
             .offset(query.offset)
             # Un SELECT extra por tabla en vez de uno por ticket (N+1).
             .options(selectinload(TicketORM.comments), selectinload(TicketORM.history))
+                        .options(
+                selectinload(TicketORM.comments),
+                selectinload(TicketORM.history),
+                selectinload(TicketORM.internal_notes),
+            )
+
         ).all()
         return TicketPage(items=[_ticket_to_domain(row) for row in rows], total=total)
 
